@@ -65,6 +65,6 @@ Android app that provides a user-friendly frontend for [rpitx](https://github.co
 - [ ] Custom rpitx parameters
 - [ ] Background service mode
 
-## License
-
-MIT License - feel free to fork and contribute!
+![connect](screenshots/connect.jpg)
+![sdr++](screenshots/sdr++.jpg)
+![Transmit](screenshots/transmit.jpg)
