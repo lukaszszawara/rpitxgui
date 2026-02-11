@@ -36,14 +36,8 @@ Android app that provides a user-friendly frontend for [rpitx](https://github.co
 
 4. **Select transmission mode** and send audio/images/text!
 
-## Supported rpitx Modes
 
-| Mode | Command Used | File Type |
-|------|--------------|-----------|
-| FM Audio | `pifm` | WAV/MP3 |
-| RDS | `pifmrds` | WAV |
-| SSTV | `pisstv` | PNG/BMP |
-| Morse | `pimorse` | Text |
+
 
 ## Screenshots
 
