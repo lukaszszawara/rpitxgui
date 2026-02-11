@@ -52,4 +52,4 @@ fun RpitxApp(modifier: Modifier = Modifier) {
     }
 }
 
-internal external fun nativeStopScan()
+external fun nativeStopScan()

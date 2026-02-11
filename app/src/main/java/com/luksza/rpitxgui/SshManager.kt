@@ -61,48 +61,71 @@ class SshManager {
     }
 
     suspend fun execute(command: String): String {
+        Log.i("SshManager", "ssh execute $command")
         if (!reconnectIfNeeded()) return "false"
 
-        return try {
-            val channel = sshSession!!.openChannel("exec") as ChannelExec
-            channel.setCommand(command)
 
-            val output = ByteArrayOutputStream()
-            channel?.setOutputStream(output)
+        return withContext(Dispatchers.IO) { // ✅ Move to IO dispatcher
+            try {
+                val channel = sshSession!!.openChannel("exec") as ChannelExec
+                channel.setCommand(command)
+                Log.i("SshManager", "ssh3 execute $command")
 
-            channel?.connect()
+                val output = ByteArrayOutputStream()
+                val error = ByteArrayOutputStream()
+                channel.setOutputStream(output)
+                channel.setErrStream(error)
 
-            // ✅ FIXED: Wait until channel closes
-            while (!channel!!.isClosed) {
-                Thread.sleep(100)
+                channel.connect()
+
+                // ✅ Better waiting with timeout (prevents infinite loops)
+                val startTime = System.currentTimeMillis()
+                val timeoutMs = 30000L // 30 second timeout
+                while (!channel.isClosed && (System.currentTimeMillis() - startTime) < timeoutMs) {
+                    delay(100) // Use coroutine delay instead of Thread.sleep
+                }
+
+                if (!channel.isClosed) {
+                    channel.disconnect() // Force disconnect on timeout
+                }
+
+                val result = output.toString()
+                val err = error.toString()
+
+                if (err.isNotEmpty()) {
+                    Log.e("SshManager", "SSH error output: $err")
+                }
+
+                result
+
+            } catch (e: Exception) {
+                Log.e("SshManager", "ssh error execute ${e.message}", e)
+                e.message ?: "Error"
             }
-
-            channel?.disconnect()
-            output.toString()
-
-        } catch (e: Exception) {
-            e.message ?: "Error"
-        } ?: "No session"
+        }
     }
 
 
-    suspend fun uploadFile(localFile: File, remotePath: String) {
-        if (!reconnectIfNeeded()) return
 
-        repeat(3) { attempt ->
-            try {
-                val sftp = sshSession!!.openChannel("sftp") as ChannelSftp
-                sftp.connect()
-                sftp.put(localFile.inputStream(), remotePath)
-                sftp.disconnect()
-                return  // ✅ SUCCESS
-            } catch (e: Exception) {
-                Log.w("SshManager", "Upload attempt ${attempt + 1} failed", e)
-                delay(1000)
-                reconnectIfNeeded()
-            }
-        }
-        throw Exception("Upload failed after 3 attempts")
+       suspend fun uploadFile(localFile: File, remotePath: String) {
+           withContext(Dispatchers.IO) {
+               if (!reconnectIfNeeded()) throw Exception("SSH connection failed")
+
+               repeat(3) { attempt ->
+                   try {
+                       val sftp = sshSession!!.openChannel("sftp") as ChannelSftp
+                       sftp.connect()
+                       sftp.put(localFile.inputStream(), remotePath)
+                       sftp.disconnect()
+                       return@withContext  // ✅ SUCCESS
+                   } catch (e: Exception) {
+                       Log.w("SshManager", "Upload attempt ${attempt + 1} failed", e)
+                       delay(1000)
+                       reconnectIfNeeded()
+                   }
+               }
+               throw Exception("Upload failed after 3 attempts")
+           }
     }
 
 

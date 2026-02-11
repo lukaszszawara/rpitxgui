@@ -76,22 +76,26 @@ internal suspend fun convertUriToWavFile(context: Context, uri: Uri): File {
 }
 
 internal fun recordAudio(context: Context, onRecorded: (File) -> Unit) {
-    val recorder = MediaRecorder(context).apply {
-        setAudioSource(MediaRecorder.AudioSource.MIC)
-        setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
-        setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-        val outputFile = File(context.cacheDir, "fmrds_${System.currentTimeMillis()}.wav")
-        setOutputFile(outputFile.absolutePath)
-        prepare()
-        start()
+    val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        MediaRecorder(context).apply {
+            setAudioSource(MediaRecorder.AudioSource.MIC)
+            setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
+            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            val outputFile = File(context.cacheDir, "fmrds_${System.currentTimeMillis()}.wav")
+            setOutputFile(outputFile.absolutePath)
+            prepare()
+            start()
 
-        // ✅ Auto-stop after 10 seconds
-        CoroutineScope(Dispatchers.IO).launch {
-            delay(10000)
-            stop()
-            release()
-            onRecorded(outputFile)
+            // ✅ Auto-stop after 10 seconds
+            CoroutineScope(Dispatchers.IO).launch {
+                delay(10000)
+                stop()
+                release()
+                onRecorded(outputFile)
+            }
         }
+    } else {
+        TODO("VERSION.SDK_INT < S")
     }
 }
 

@@ -4,6 +4,7 @@ import SshManager
 import android.Manifest
 import android.annotation.SuppressLint
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -312,6 +313,11 @@ fun RpitxControls(
                             "Selected: ${uri.lastPathSegment}",
                             style = MaterialTheme.typography.bodySmall
                         )
+                        coroutineScope.launch {
+                            val resizedFile = resizeImage(context, uri, 320, 240)
+                            filePath = "/tmp/RPITX_IMAGE.jpg"
+                            sshManager.uploadFile(resizedFile, filePath)
+                        }
                     }
                 }
             }
@@ -333,8 +339,26 @@ fun RpitxControls(
                             else -> null
                         }
                         Text(currentUri?.let { "✅ Audio Ready" } ?: "📁 Pick Mono WAV")
+
                     }
+
+                    val currentUri = when (mode) {
+                        "FmRds" -> fmrDSAudioUri
+                        "NFM" -> nfmAudioUri
+                        "SSB" -> ssbAudioUri
+                        "AM" -> amAudioUri
+                        else -> null
+                    }
+                    currentUri?.let { uri ->
+                        coroutineScope.launch {
+                            val resizedFile = convertUriToWavFile(context,uri)
+                            filePath = "/tmp/RPITX_AUDIO.wav"
+                            sshManager.uploadFile(resizedFile, filePath)
+                        }
+                    }
+
                 }
+
             }
         }
 
@@ -343,15 +367,20 @@ fun RpitxControls(
         // 5. TRANSMIT BUTTON
         Button(
             onClick = {
-                // Your existing transmit logic (unchanged)
+                Log.i("SshManager", "execute mode"+mode)
                 val cmd = when (mode) {
                     "Tune" -> "testvfo.sh ${frequency}e6"
                     "Chirp" -> "testchirp.sh ${frequency}e6"
                     "RfMyFace" -> "snap2spectrum.sh ${frequency}e6"
+                    "Spectrum" -> "testspectrum.sh ${frequency}e6 \"$filePath\""
                     "Pocsag" -> "testpocsag.sh ${frequency}e6 \"$pocslagMessage\""
                     "Opera" -> "testopera.sh ${frequency}e6 $operaCallsign"
                     "RTTY" -> "testrtty.sh ${frequency}e6 \"$rttyMessage\""
-                    // ... rest of your transmit cases
+                    "NFM" -> "testnfm.sh ${frequency}e6 \"$filePath\""
+                    "FmRds" -> "testfmrds.sh ${frequency}e6 \"$filePath\""
+                    "SSB" -> "testssb.sh ${frequency}e6 \"$filePath\""
+                    "AM" -> "testam.sh ${frequency}e6 \"$filePath\""
+                    "SSTV" -> "testsstv.sh ${frequency}e6 \"$filePath\""
                     else -> "${mode.lowercase()}.sh ${frequency}e6"
                 }
                 coroutineScope.launch {
