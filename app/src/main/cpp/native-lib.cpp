@@ -40,7 +40,7 @@ bool testIp(const std::string& ip) {
     }
 
     // ⚡ 100ms → 80% faster!
-    struct timeval tv = {0, 150000};  // 100ms
+    struct timeval tv = {0, 200000};  // 100ms
     setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
     int result = connect(sock, (struct sockaddr*)&addr, sizeof(addr));
