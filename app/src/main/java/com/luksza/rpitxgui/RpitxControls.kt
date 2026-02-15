@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -97,20 +99,65 @@ fun RpitxControls(
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    "📶 Frequency",
+                    "Frequency",
                     fontWeight = FontWeight.Thin,
                     style = MaterialTheme.typography.headlineSmall
                 )
-                Text("Current: $frequency MHz", style = MaterialTheme.typography.bodyLarge)
-                Slider(
-                    value = frequency.toFloatOrNull() ?: 434f,
-                    onValueChange = { onFrequencyChange(String.format("%.1f", it)) },
-                    valueRange = 0.05f..1500f,
-                    steps = 14995,
-                    modifier = Modifier.fillMaxWidth()
-                )
+
+                // Toggle between Slider and TextInput modes
+                var useTextInput by remember { mutableStateOf(false) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Current: $frequency MHz", style = MaterialTheme.typography.bodyLarge)
+                    TextButton(onClick = { useTextInput = !useTextInput }) {
+                        Text(if (useTextInput) "Use Slider" else "Use Keyboard")
+                    }
+                }
+
+                if (useTextInput) {
+                    // Text input mode - works with Android keyboard
+                    OutlinedTextField(
+                        value = frequency,
+                        onValueChange = { newValue ->
+                            // Validate and format input (only numbers and decimal)
+                            val cleanValue = newValue.filter { it.isDigit() || it == '.' }
+                            if (cleanValue.toFloat() in 0.05f..1500f) {
+                                onFrequencyChange(String.format("%.1f", cleanValue.toFloat()))
+                            }
+                        },
+                        label = { Text("Frequency (MHz)") },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    // Slider mode - fixed responsiveness issue
+                    var sliderValue by remember(frequency) {
+                        mutableFloatStateOf(frequency.toFloatOrNull() ?: 434f)
+                    }
+
+                    Slider(
+                        value = sliderValue,
+                        onValueChange = { newValue ->
+                            sliderValue = newValue
+                        },
+                        onValueChangeFinished = {
+                            // Only call callback when user finishes dragging
+                            onFrequencyChange(String.format("%.1f", sliderValue))
+                        },
+                        valueRange = 0.05f..1500f,
+                        steps = 14995,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
+
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -221,7 +268,7 @@ fun RpitxControls(
                         } else {
                             Icon(Icons.Default.PlayArrow, null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("▶️ EXECUTE")
+                            Text("EXECUTE")
                         }
                     }
 
@@ -293,7 +340,7 @@ fun RpitxControls(
             }
             "RTTY" -> Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("⌨️ RTTY Message", fontWeight = FontWeight.Bold)
+                    Text("RTTY Message", fontWeight = FontWeight.Bold)
                     OutlinedTextField(
                         value = rttyMessage,
                         onValueChange = { rttyMessage = it },
@@ -304,7 +351,7 @@ fun RpitxControls(
             }
             "Spectrum", "SSTV" -> Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🖼️ Image", fontWeight = FontWeight.Bold)
+                    Text("Image", fontWeight = FontWeight.Bold)
                     Button(onClick = { imagePickerLauncher.launch("image/*") }) {
                         Text(if (spectrumImageUri == null) "📸 Pick image" else "✅ Image Ready")
                     }
@@ -323,11 +370,11 @@ fun RpitxControls(
             }
             "FmRds", "NFM", "SSB", "AM" -> Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🎤 Audio", fontWeight = FontWeight.Bold)
+                    Text("Audio", fontWeight = FontWeight.Bold)
                     Button(onClick = {
                         audioRecorderLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     }) {
-                        Text("🎤 Record Message (10s)")
+                        Text("Record Message (10s)")
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(onClick = { audioPickerLauncher.launch("audio/*;wav/*") }) {
@@ -338,7 +385,7 @@ fun RpitxControls(
                             "AM" -> amAudioUri
                             else -> null
                         }
-                        Text(currentUri?.let { "✅ Audio Ready" } ?: "📁 Pick Mono WAV")
+                        Text(currentUri?.let { "Audio Ready" } ?: "Pick Mono WAV")
 
                     }
 
@@ -392,7 +439,7 @@ fun RpitxControls(
         ) {
             Icon(Icons.Default.PlayArrow, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("🚀 TRANSMIT $mode", fontWeight = FontWeight.Bold)
+            Text("TRANSMIT $mode", fontWeight = FontWeight.Bold)
         }
     }
 }
