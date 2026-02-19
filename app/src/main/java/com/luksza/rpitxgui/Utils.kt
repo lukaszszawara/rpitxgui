@@ -1,5 +1,6 @@
 package com.luksza.rpitxgui
 
+import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
@@ -74,6 +75,45 @@ internal suspend fun convertUriToWavFile(context: Context, uri: Uri): File {
 
     return tempFile
 }
+
+private var currentRecorder: MediaRecorder? = null
+
+internal fun recordAudioWhilePressed(
+    activity: Activity,
+    onRecorded: (File) -> Unit
+): MediaRecorder? {
+    return try {
+        val outputFile = File(activity.cacheDir, "fmrds_${System.currentTimeMillis()}.m4a")
+        val recorder = MediaRecorder(activity).apply {
+            currentRecorder = this
+
+
+            setAudioSource(MediaRecorder.AudioSource.MIC)
+            setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
+            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+
+            setOutputFile(outputFile.absolutePath)
+            prepare()
+            start()
+        }
+        recorder
+    } catch (e: Exception) {
+        null
+    }
+}
+
+private fun stopRecording() {
+    currentRecorder?.let { recorder ->
+        try {
+            recorder.stop()
+            recorder.release()
+        } catch (e: Exception) {
+            // Handle partial recording
+        }
+        currentRecorder = null
+    }
+}
+
 
 internal fun recordAudio(context: Context, onRecorded: (File) -> Unit) {
     val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

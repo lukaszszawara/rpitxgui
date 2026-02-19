@@ -3,10 +3,13 @@ package com.luksza.rpitxgui
 import SshManager
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.media.MediaRecorder
 import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -16,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+
 
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
@@ -29,13 +33,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.util.logging.Logger
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reusable section-card header
@@ -88,6 +98,10 @@ fun RpitxControls(
     var amAudioUri       by remember { mutableStateOf<Uri?>(null) }
     var fmrDSAudioUri    by remember { mutableStateOf<Uri?>(null) }
 
+    var isRecording by remember { mutableStateOf(false) }
+    var currentRecorder by remember { mutableStateOf<MediaRecorder?>(null) }
+
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? -> spectrumImageUri = uri }
@@ -102,6 +116,8 @@ fun RpitxControls(
             "AM"    -> amAudioUri    = uri
         }
     }
+
+
 
     val audioRecorderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -336,20 +352,81 @@ fun RpitxControls(
 
             "FmRds", "NFM", "SSB", "AM" -> SectionCard(title = "Audio") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+
+
+
                     FilledTonalButton(
-                        onClick = { audioRecorderLauncher.launch(Manifest.permission.RECORD_AUDIO) },
-                        modifier = Modifier.weight(1f)
+                        onClick = {},
+                        enabled = !isRecording,
+                        modifier = Modifier
+                            .weight(1f)
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        when (event.type) {
+                                            PointerEventType.Press -> {
+                                                isRecording = true
+                                                currentRecorder = recordAudioWhilePressed(context as Activity) { file ->
+                                                    fmrDSAudioUri = Uri.fromFile(file)
+
+                                                }
+                                            }
+                                            PointerEventType.Release -> {
+                                                isRecording = false
+                                                currentRecorder?.apply {
+                                                    try { stop(); release() } catch (e: Exception) {}
+                                                    val currentUri = fmrDSAudioUri
+                                                        currentUri?.let { uri ->
+                                                        coroutineScope.launch {
+                                                            val resizedFile = convertUriToWavFile(context, uri)
+                                                            filePath = "/tmp/RPITX_AUDIO.wav"
+                                                            sshManager.uploadFile(resizedFile, filePath)
+                                                        }
+                                                    }
+                                                }
+
+                                                currentRecorder = null
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+
+
+                        Icon(
+                            painterResource(R.drawable.outline_mic_24),
+                            contentDescription = when {
+                                isRecording -> "Release to stop"
+                                fmrDSAudioUri != null -> "Audio ready"
+                                else -> "Hold to record"
+                            },
+
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Record 10s")
+                        Text(
+                            when {
+                                fmrDSAudioUri != null -> "Audio ready"
+                                isRecording -> "Recording..."
+                                else -> "Hold to Record"
+                            }
+                        )
                     }
+
+
+
+
+
+
+
+
                     Button(
                         onClick = { audioPickerLauncher.launch("audio/*;wav/*") },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
+
                         val currentUri = when (mode) {
                             "FmRds" -> fmrDSAudioUri
                             "NFM"   -> nfmAudioUri
@@ -357,6 +434,8 @@ fun RpitxControls(
                             "AM"    -> amAudioUri
                             else    -> null
                         }
+                        Icon(if (currentUri != null) Icons.Default.Check else Icons.Default.Home, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(if (currentUri != null) "Audio ready" else "Pick WAV")
                     }
                 }
