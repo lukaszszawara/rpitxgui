@@ -2,7 +2,6 @@
 
 Android app that provides a user-friendly frontend for [rpitx](https://github.com/F5OEO/rpitx) - turning your Raspberry Pi into a software-defined radio transmitter.
 
-[Youtube app showcase](https://youtu.be/FulOqEAxC4k?si=8cfr39CB05NlfnoH)
 
 ## Features
 
